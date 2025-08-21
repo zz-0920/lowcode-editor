@@ -1,9 +1,7 @@
-import LowCodeEditor from "./editor/index"
+import LowcodeEditor from './editor/index.tsx'
 
 export default function App() {
   return (
-    <div>
-      <LowCodeEditor />
-    </div>
+    <LowcodeEditor/>
   )
 }

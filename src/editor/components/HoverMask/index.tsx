@@ -1,60 +1,105 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { createPortal} from 'react-dom'
+import { getComponentById, useComponentsStore } from '../../stores/components'
 
 interface HoverMaskProps {
-  componentId?: number
-  componentName?: string
-  containerRef: React.RefObject<HTMLDivElement>
+  containerClassName: string
+  componentId: number,
+  portalWrapperClassName: string
 }
 
 // HoverMask 会在鼠标移入组件时显示，并能完整覆盖整个组件
-export default function HoverMask({ componentId, componentName, containerRef }: HoverMaskProps) {
-  const [position, setPosition] = useState({ top: 0, left: 0, width: 0, height: 0 })
-  const [visible, setVisible] = useState(false)
+export default function HoverMask({ containerClassName, componentId, portalWrapperClassName }: HoverMaskProps) {
+  const { components } = useComponentsStore()
+
+  const [position, setPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+    height: 0,
+    labelTop: 0,
+    labelLeft: 0,
+  })
 
   useEffect(() => {
-    if (!componentId || !containerRef.current) {
-      setVisible(false)
-      return
-    }
+    updatePosition()
+  }, [componentId])
 
-    // 查找目标组件元素
-    const targetElement = containerRef.current.querySelector(`[data-component-id="${componentId}"]`) as HTMLElement
-    if (!targetElement) {
-      setVisible(false)
-      return
-    }
+  function updatePosition() {
+    if (!componentId) return
 
-    // 获取容器和目标元素的位置信息
-    const containerRect = containerRef.current.getBoundingClientRect()
-    const targetRect = targetElement.getBoundingClientRect()
+    const container = document.querySelector(`.${containerClassName}`)
+    if (!container) return
 
-    // 计算相对于容器的位置
+    const node = document.querySelector(`[data-component-id="${componentId}"]`)
+    if (!node) return
+
+    const { top, left, width, height } = node.getBoundingClientRect()
+    const {top: containerTop, left: containerLeft} = container.getBoundingClientRect()
+
     setPosition({
-      top: targetRect.top - containerRect.top,
-      left: targetRect.left - containerRect.left,
-      width: targetRect.width,
-      height: targetRect.height
+      top: top - containerTop + container.scrollTop,
+      left: left - containerLeft + container.scrollTop,
+      width,
+      height,
+      labelTop: top - containerTop + container.scrollTop,
+      labelLeft: left - containerLeft + width,
     })
-    setVisible(true)
-  }, [componentId, containerRef])
-
-  if (!visible || !componentId) {
-    return null
   }
 
-  return (
-    <div
-      className="absolute pointer-events-none border-2 border-blue-500 bg-blue-100 bg-opacity-20 z-10"
-      style={{
+
+  const el = useMemo(() => {
+    // const el = document.createElement('div')
+    // el.className = 'wrapper'
+    // const container = document.querySelector(`.${containerClassName}`)
+    // container!.appendChild(el)
+    // return el
+    return document.querySelector(`.${portalWrapperClassName}`)
+  }, [])
+
+  const curComponent = useMemo(() => {
+    return getComponentById(componentId, components)
+  }, [componentId])
+
+
+  return createPortal((
+    <>
+      <div style={{
+        position: 'absolute',
         top: position.top,
         left: position.left,
         width: position.width,
         height: position.height,
-      }}
-    >
-      <div className="absolute -top-6 left-0 bg-blue-500 text-white text-xs px-2 py-1 rounded">
-        {componentName || (componentId ? `组件ID: ${componentId}` : '')}
+        backgroundColor: 'rgba(0, 0, 255, 0.1)',
+        border: '1px dashed blue',
+        borderRadius: 4,
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+        zIndex: 12
+      }}></div>
+
+      <div 
+        style={{
+          position: 'absolute',
+          top: position.labelTop,
+          left: position.labelLeft,
+          fontSize: 14,
+          zIndex: 13,
+          display: (!position.width || position.width < 10) ? 'none' : 'inline-block',
+          transform: 'translate(-100%, -100%)'
+        }}
+      >
+        <div
+          style={{
+            padding: '0px 8px',
+            backgroundColor: 'blue',
+            color: '#fff',
+            borderRadius: 4,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >{curComponent?.desc}</div>
       </div>
-    </div>
-  )
+    </>
+  ), el as HTMLElement)
 }
